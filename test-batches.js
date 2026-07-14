@@ -6,19 +6,37 @@ const vm = require("node:vm");
 	for (const arquivo of ["beeMovieSendScript.js", "shrekSendScript.js"]) {
 		const codigo = fs.readFileSync(arquivo, "utf8").split("enviarScript(`", 1)[0];
 		let buscas = 0;
+		let chatAtual = "Pessoa A";
 		let campoAtual = 0;
+		let reaberturas = 0;
 		const focados = [];
-		const campos = [0, 1].map(id => ({focus() { focados.push(id); }, getAttribute() { return "Pessoa A"; }, dispatchEvent(event) { assert.equal(event.type, "input"); }}));
-		const botao = {cliques: 0, click() { this.cliques++; campoAtual++; }};
+		const valoresBusca = [];
+		class CampoBusca {
+			focus() {}
+			get value() { return this._value; }
+			set value(valor) { this._value = valor; valoresBusca.push(valor); }
+			dispatchEvent(event) { assert.equal(event.type, "input"); }
+		}
+		const busca = new CampoBusca();
+		const botao = {cliques: 0, click() { this.cliques++; if (this.cliques === 1) chatAtual = "Pessoa B"; }};
 		const main = {querySelector(seletor) {
-			if (seletor.includes("contenteditable")) return campos[campoAtual];
+			if (seletor.includes("contenteditable")) {
+				const id = campoAtual++;
+				return {focus() { focados.push(id); }, getAttribute() { return `Digite uma mensagem para ${chatAtual}`; }, dispatchEvent(event) { assert.equal(event.type, "input"); }};
+			}
 			assert.match(seletor, /aria-label="Enviar"/);
 			return ++buscas > 2 ? {closest: () => botao} : null;
 		}};
+		const titulo = {getAttribute: () => "Pessoa A", closest: () => ({click() { chatAtual = "Pessoa A"; reaberturas++; }})};
 		const contexto = {
 			console: {log() {}},
-			document: {querySelector: () => main, execCommand: () => true},
+			document: {
+				querySelector: seletor => seletor === "#main" ? main : busca,
+				querySelectorAll: () => [titulo],
+				execCommand: () => true
+			},
 			Event: class { constructor(type) { this.type = type; } },
+			HTMLInputElement: CampoBusca,
 			setTimeout: resolve => resolve()
 		};
 		vm.runInNewContext(codigo, contexto);
@@ -27,13 +45,9 @@ const vm = require("node:vm");
 		assert.throws(() => contexto.criarLotes("a", 0), /ao menos uma linha/);
 		assert.equal(await contexto.enviarScript("a\nb\nc", 2, 0), 2);
 		assert.equal(botao.cliques, 2);
-		assert.deepEqual(focados, [0, 1]);
-
-		campoAtual = 0;
-		botao.cliques = 0;
-		campos[1].getAttribute = () => "Pessoa B";
-		await assert.rejects(contexto.enviarScript("a\nb\nc", 2, 0), /conversa mudou/);
-		assert.equal(botao.cliques, 1);
+		assert.equal(new Set(focados).size, 2);
+		assert.equal(reaberturas, 1);
+		assert.deepEqual(valoresBusca, ["Pessoa A", ""]);
 	}
 
 	console.log("Lotes e envio sequencial validados nos dois scripts");

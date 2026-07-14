@@ -25,20 +25,66 @@ function buscarCampo(main) {
 	return campo;
 }
 
-function identificarConversa(campo) {
-	const conversa = campo.getAttribute("aria-label");
-	if (!conversa) throw new Error("Não foi possível identificar o destinatário");
-	return conversa;
+function identificarDestinatario(campo) {
+	const rotulo = campo.getAttribute("aria-label") || "";
+	const prefixo = ["Digite uma mensagem para ", "Type a message to "].find(texto => rotulo.startsWith(texto));
+	if (!prefixo) throw new Error("Não foi possível identificar o destinatário");
+	return rotulo.slice(prefixo.length);
+}
+
+function preencherBusca(campo, valor) {
+	const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+	setter.call(campo, valor);
+	campo.dispatchEvent(new Event("input", {bubbles: true}));
+}
+
+async function abrirConversa(destinatario, timeout = 5000) {
+	let main = document.querySelector("#main");
+	try {
+		if (identificarDestinatario(buscarCampo(main)) === destinatario) return main;
+	} catch {}
+
+	const busca = document.querySelector('#side input[role="textbox"]');
+	if (!busca) throw new Error("Campo de busca do WhatsApp não encontrado");
+	busca.focus();
+	preencherBusca(busca, destinatario);
+
+	const limite = Date.now() + timeout;
+	let linha;
+	do {
+		const titulo = Array.from(document.querySelectorAll('#pane-side [role="row"] [title]')).find(elemento => elemento.getAttribute("title") === destinatario);
+		linha = titulo?.closest('[role="row"]');
+		if (linha) break;
+		await esperar(100);
+	} while (Date.now() < limite);
+	if (!linha) {
+		preencherBusca(busca, "");
+		throw new Error(`Conversa não encontrada: ${destinatario}`);
+	}
+
+	linha.click();
+	const limiteAbertura = Date.now() + timeout;
+	do {
+		main = document.querySelector("#main");
+		try {
+			if (identificarDestinatario(buscarCampo(main)) === destinatario) {
+				preencherBusca(busca, "");
+				return main;
+			}
+		} catch {}
+		await esperar(100);
+	} while (Date.now() < limiteAbertura);
+	preencherBusca(busca, "");
+	throw new Error(`Não foi possível abrir a conversa: ${destinatario}`);
 }
 
 async function enviarScript(scriptText, linhasPorMensagem = 10, intervalo = 1000) {
 	if (!Number.isInteger(intervalo) || intervalo < 0) throw new Error("O intervalo deve ser um número inteiro não negativo");
-	const main = document.querySelector("#main");
-	const conversa = identificarConversa(buscarCampo(main));
+	const destinatario = identificarDestinatario(buscarCampo(document.querySelector("#main")));
 	const lotes = criarLotes(scriptText, linhasPorMensagem);
 	for (const [indice, lote] of lotes.entries()) {
+		const main = await abrirConversa(destinatario);
 		const campo = buscarCampo(main);
-		if (identificarConversa(campo) !== conversa) throw new Error("A conversa mudou; envio interrompido antes do próximo lote");
 		campo.focus();
 		if (!document.execCommand("insertText", false, lote)) campo.textContent = lote;
 		campo.dispatchEvent(new Event("input", {bubbles: true}));
