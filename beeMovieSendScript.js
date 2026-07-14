@@ -9,7 +9,7 @@ function criarLotes(scriptText, linhasPorMensagem = 10) {
 }
 
 async function esperarBotao(main, timeout = 5000) {
-	const seletor = '[data-testid="wds-ic-send-filled"], [data-icon="wds-ic-send-filled"], [data-testid="send"], [data-icon="send"]';
+	const seletor = 'button[aria-label="Enviar"], button[aria-label="Send"], [data-testid="wds-ic-send-filled"], [data-icon="wds-ic-send-filled"], [data-testid="send"], [data-icon="send"]';
 	const limite = Date.now() + timeout;
 	do {
 		const icone = main.querySelector(seletor);
@@ -19,17 +19,21 @@ async function esperarBotao(main, timeout = 5000) {
 	throw new Error("Botão de enviar não encontrado; o WhatsApp Web pode ter mudado");
 }
 
+function buscarCampo(main) {
+	const campo = main?.querySelector('footer div[contenteditable="true"][role="textbox"]') || main?.querySelector('div[contenteditable="true"][role="textbox"]');
+	if (!campo) throw new Error("Abra uma conversa antes de executar o script");
+	return campo;
+}
+
 async function enviarScript(scriptText, linhasPorMensagem = 10, intervalo = 1000) {
 	if (!Number.isInteger(intervalo) || intervalo < 0) throw new Error("O intervalo deve ser um número inteiro não negativo");
 	const main = document.querySelector("#main");
-	const textarea = main?.querySelector('div[contenteditable="true"][role="textbox"]') || main?.querySelector('div[contenteditable="true"]');
-	if (!textarea) throw new Error("Abra uma conversa antes de executar o script");
-
 	const lotes = criarLotes(scriptText, linhasPorMensagem);
 	for (const [indice, lote] of lotes.entries()) {
-		textarea.focus();
-		if (!document.execCommand("insertText", false, lote)) textarea.textContent = lote;
-		textarea.dispatchEvent(new Event("input", {bubbles: true}));
+		const campo = buscarCampo(main);
+		campo.focus();
+		if (!document.execCommand("insertText", false, lote)) campo.textContent = lote;
+		campo.dispatchEvent(new Event("input", {bubbles: true}));
 		(await esperarBotao(main)).click();
 		console.log(`Lote ${indice + 1}/${lotes.length} enviado`);
 		if (indice < lotes.length - 1) await esperar(intervalo);
