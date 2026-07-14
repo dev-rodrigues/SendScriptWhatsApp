@@ -1,25 +1,40 @@
-async function enviarScript(scriptText){
-	const lines = scriptText.split(/[\n\t]+/).map(line => line.trim()).filter(line => line);
-	main = document.querySelector("#main"),
-	textarea = main.querySelector(`div[contenteditable="true"]`)
-	
-	if(!textarea) throw new Error("Não há uma conversa aberta")
-	
-	for(const line of lines){
-		console.log(line)
-	
+const esperar = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function criarLotes(scriptText, linhasPorMensagem = 10) {
+	if (!Number.isInteger(linhasPorMensagem) || linhasPorMensagem < 1) throw new Error("O lote deve ter ao menos uma linha");
+	const linhas = scriptText.split(/[\n\t]+/).map(linha => linha.trim()).filter(Boolean);
+	const lotes = [];
+	for (let i = 0; i < linhas.length; i += linhasPorMensagem) lotes.push(linhas.slice(i, i + linhasPorMensagem).join("\n"));
+	return lotes;
+}
+
+async function esperarBotao(main, timeout = 5000) {
+	const seletor = '[data-testid="wds-ic-send-filled"], [data-icon="wds-ic-send-filled"], [data-testid="send"], [data-icon="send"]';
+	const limite = Date.now() + timeout;
+	do {
+		const icone = main.querySelector(seletor);
+		if (icone) return icone.closest("button") || icone;
+		await esperar(100);
+	} while (Date.now() < limite);
+	throw new Error("Botão de enviar não encontrado; o WhatsApp Web pode ter mudado");
+}
+
+async function enviarScript(scriptText, linhasPorMensagem = 10, intervalo = 1000) {
+	if (!Number.isInteger(intervalo) || intervalo < 0) throw new Error("O intervalo deve ser um número inteiro não negativo");
+	const main = document.querySelector("#main");
+	const textarea = main?.querySelector('div[contenteditable="true"][role="textbox"]') || main?.querySelector('div[contenteditable="true"]');
+	if (!textarea) throw new Error("Abra uma conversa antes de executar o script");
+
+	const lotes = criarLotes(scriptText, linhasPorMensagem);
+	for (const [indice, lote] of lotes.entries()) {
 		textarea.focus();
-		document.execCommand('insertText', false, line);
-		textarea.dispatchEvent(new Event('change', {bubbles: true}));
-	
-		setTimeout(() => {
-			(main.querySelector(`[data-testid="send"]`) || main.querySelector(`[data-icon="send"]`)).click();
-		}, 100);
-		
-		if(lines.indexOf(line) !== lines.length - 1) await new Promise(resolve => setTimeout(resolve, 250));
+		if (!document.execCommand("insertText", false, lote)) textarea.textContent = lote;
+		textarea.dispatchEvent(new Event("input", {bubbles: true}));
+		(await esperarBotao(main)).click();
+		console.log(`Lote ${indice + 1}/${lotes.length} enviado`);
+		if (indice < lotes.length - 1) await esperar(intervalo);
 	}
-	
-	return lines.length;
+	return lotes.length;
 }
 
 enviarScript(`
