@@ -8,7 +8,7 @@ const vm = require("node:vm");
 		let buscas = 0;
 		let campoAtual = 0;
 		const focados = [];
-		const campos = [0, 1].map(id => ({focus() { focados.push(id); }, dispatchEvent(event) { assert.equal(event.type, "input"); }}));
+		const campos = [0, 1].map(id => ({focus() { focados.push(id); }, getAttribute() { return "Pessoa A"; }, dispatchEvent(event) { assert.equal(event.type, "input"); }}));
 		const botao = {cliques: 0, click() { this.cliques++; campoAtual++; }};
 		const main = {querySelector(seletor) {
 			if (seletor.includes("contenteditable")) return campos[campoAtual];
@@ -28,6 +28,12 @@ const vm = require("node:vm");
 		assert.equal(await contexto.enviarScript("a\nb\nc", 2, 0), 2);
 		assert.equal(botao.cliques, 2);
 		assert.deepEqual(focados, [0, 1]);
+
+		campoAtual = 0;
+		botao.cliques = 0;
+		campos[1].getAttribute = () => "Pessoa B";
+		await assert.rejects(contexto.enviarScript("a\nb\nc", 2, 0), /conversa mudou/);
+		assert.equal(botao.cliques, 1);
 	}
 
 	console.log("Lotes e envio sequencial validados nos dois scripts");

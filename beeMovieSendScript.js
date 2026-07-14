@@ -25,12 +25,20 @@ function buscarCampo(main) {
 	return campo;
 }
 
+function identificarConversa(campo) {
+	const conversa = campo.getAttribute("aria-label");
+	if (!conversa) throw new Error("Não foi possível identificar o destinatário");
+	return conversa;
+}
+
 async function enviarScript(scriptText, linhasPorMensagem = 10, intervalo = 1000) {
 	if (!Number.isInteger(intervalo) || intervalo < 0) throw new Error("O intervalo deve ser um número inteiro não negativo");
 	const main = document.querySelector("#main");
+	const conversa = identificarConversa(buscarCampo(main));
 	const lotes = criarLotes(scriptText, linhasPorMensagem);
 	for (const [indice, lote] of lotes.entries()) {
 		const campo = buscarCampo(main);
+		if (identificarConversa(campo) !== conversa) throw new Error("A conversa mudou; envio interrompido antes do próximo lote");
 		campo.focus();
 		if (!document.execCommand("insertText", false, lote)) campo.textContent = lote;
 		campo.dispatchEvent(new Event("input", {bubbles: true}));

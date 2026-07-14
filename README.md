@@ -19,6 +19,8 @@ Envia os roteiros de Shrek ou Bee Movie em mensagens agrupadas pelo WhatsApp Web
 
 Se o Chrome bloquear a colagem, leia o alerta de segurança. Somente depois de revisar e confiar no código, digite `allow pasting`, pressione `Enter` e tente colar novamente.
 
+A conversa aberta no início fica fixada como destinatária. Se você abrir outra pessoa ou grupo durante a execução, o script interrompe antes do próximo lote para evitar envio no chat errado.
+
 ## Configurar os lotes
 
 Os valores padrão ficam na assinatura da função, no início de cada arquivo:
@@ -49,6 +51,7 @@ Recarregue ou feche a aba do WhatsApp Web. As mensagens já enviadas não são d
 
 - `Abra uma conversa antes de executar o script`: selecione uma conversa e execute novamente.
 - `Botão de enviar não encontrado`: recarregue o WhatsApp Web. Se continuar, a interface pode ter mudado e os seletores precisam ser atualizados.
+- `A conversa mudou`: volte à conversa original e inicie novamente; os lotes já enviados não serão repetidos automaticamente.
 - O Console não aceita a colagem: siga o alerta de segurança do Chrome descrito acima.
 
 ## Validar localmente
